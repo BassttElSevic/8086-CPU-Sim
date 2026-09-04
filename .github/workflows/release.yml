@@ -1,0 +1,87 @@
+name: release
+
+# 每次打上形如 v1.0.0 的 tag，自动构建并发布“解压即用”的发行包。
+# 不需要用户安装任何编译器：Windows 包是已编译好的 GUI 启动器 + 内置 BIOS；
+# 在 Linux/CI 上用 MinGW 交叉编译，Windows 用户直接下载 .exe 即可。
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write   # 允许把构建产物挂载到 GitHub Release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y make gcc binutils zip
+          # 交叉编译 Windows .exe 所需（项目 Makefile 支持 TARGET=windows）
+          sudo apt-get install -y gcc-mingw-w64-i686
+
+      - name: Build Linux launcher (host toolchain)
+        run: |
+          make clean
+          make
+          rm -rf release
+          mkdir -p release/pc_sim_launcher-linux
+          cp dist/apps/pc_sim_launcher release/pc_sim_launcher-linux/
+          cp dist/firmware/pc_compat_bios.bin release/pc_sim_launcher-linux/
+          chmod +x release/pc_sim_launcher-linux/pc_sim_launcher
+          cat > release/pc_sim_launcher-linux/README.txt <<'EOF'
+          8086 CPU Simulator — 免安装、免编译，解压即用
+
+          启动方式：
+            Linux / macOS:   ./pc_sim_launcher
+
+          本目录已内置 BIOS 镜像（pc_compat_bios.bin），无需任何额外配置。
+          如需软盘镜像 / 虚拟硬盘，可在启动器界面里选择对应文件。
+          如需从源码构建，请参考项目 README。
+          EOF
+
+      - name: Build Windows launcher (MinGW cross-compile)
+        run: |
+          make clean
+          make TARGET=windows CC=i686-w64-mingw32-gcc
+          mkdir -p release/pc_sim_launcher-win
+          cp dist/apps/pc_sim_launcher.exe release/pc_sim_launcher-win/
+          cp dist/firmware/pc_compat_bios.bin release/pc_sim_launcher-win/
+          cat > release/pc_sim_launcher-win/README.txt <<'EOF'
+          8086 CPU Simulator — 免安装、免编译，解压即用
+
+          启动方式：
+            双击本文件夹里的 pc_sim_launcher.exe 即可运行。
+
+          本目录已内置 BIOS 镜像（pc_compat_bios.bin），无需任何配置。
+          如需软盘镜像 / 虚拟硬盘，可在界面里浏览并选择对应文件。
+          如需从源码构建，请参考项目 README。
+          EOF
+
+      - name: Archive release bundles
+        run: |
+          cd release
+          zip -r ../pc_sim_launcher-win.zip pc_sim_launcher-win
+          tar czf ../pc_sim_launcher-linux.tar.gz pc_sim_launcher-linux
+
+      - name: Publish to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            pc_sim_launcher-win.zip
+            pc_sim_launcher-linux.tar.gz
+          body: |
+            ## 开箱即用（免编译）
+
+            下载对应平台的压缩包，解压后按里面的 `README.txt` 双击启动即可，**无需安装任何编译器**。
+
+            - **`pc_sim_launcher-win.zip`** — Windows GUI 启动器（含内置 BIOS），解压后双击 `pc_sim_launcher.exe`。
+            - **`pc_sim_launcher-linux.tar.gz`** — Linux/macOS 启动器（当前为控制台 stub）。
+
+            两个包内部都已包含 `pc_compat_bios.bin`，BIOS 与启动器平级放置，开箱即用。

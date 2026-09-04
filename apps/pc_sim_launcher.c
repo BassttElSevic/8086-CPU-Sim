@@ -373,6 +373,7 @@ static void default_bios_path(wchar_t path[MAX_PATH])
 {
     wchar_t resolved[MAX_PATH];
     wchar_t *separator;
+    size_t dir_len;
     DWORD length;
 
     path[0] = L'\0';
@@ -382,13 +383,31 @@ static void default_bios_path(wchar_t path[MAX_PATH])
         return;
     }
     separator = wcsrchr(path, L'\\');
-    if (separator == NULL || (size_t)(separator - path) + 31u >= MAX_PATH) {
+    if (separator == NULL) {
         (void)wcscpy(path, L"firmware\\pc_compat_bios.bin");
         return;
     }
-    (void)wcscpy(separator, L"\\..\\firmware\\pc_compat_bios.bin");
-    if (GetFullPathNameW(path, MAX_PATH, resolved, NULL) != 0u) {
-        (void)wcscpy(path, resolved);
+    dir_len = (size_t)(separator - path);
+
+    /* Self-contained release folder: the BIOS sits next to the launcher
+       ("download, unzip, double-click" — no extra setup required). */
+    if (dir_len + 18u < MAX_PATH) {
+        (void)wcscpy(separator, L"\\pc_compat_bios.bin");
+        if (GetFullPathNameW(path, MAX_PATH, resolved, NULL) != 0u &&
+            path_is_file(resolved)) {
+            (void)wcscpy(path, resolved);
+            return;
+        }
+    }
+
+    /* Repository layout: launcher under apps/, BIOS under firmware/. */
+    if (dir_len + 31u < MAX_PATH) {
+        (void)wcscpy(separator, L"\\..\\firmware\\pc_compat_bios.bin");
+        if (GetFullPathNameW(path, MAX_PATH, resolved, NULL) != 0u) {
+            (void)wcscpy(path, resolved);
+        }
+    } else {
+        (void)wcscpy(path, L"firmware\\pc_compat_bios.bin");
     }
 }
 
