@@ -1,7 +1,40 @@
 #include "sim/sim_rom.h"
 
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+
+#ifdef _WIN32
+#include <windows.h>
+extern FILE *_wfopen(const wchar_t *path, const wchar_t *mode);
+
+static FILE *open_binary_file(const char *path)
+{
+    int characters;
+    wchar_t *wide_path;
+    FILE *file;
+
+    if (path == NULL) return NULL;
+    characters = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+                                     path, -1, NULL, 0);
+    if (characters <= 0) return NULL;
+    wide_path = malloc((size_t)characters * sizeof(*wide_path));
+    if (wide_path == NULL) return NULL;
+    if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, -1,
+                            wide_path, characters) <= 0) {
+        free(wide_path);
+        return NULL;
+    }
+    file = _wfopen(wide_path, L"rb");
+    free(wide_path);
+    return file;
+}
+#else
+static FILE *open_binary_file(const char *path)
+{
+    return path == NULL ? NULL : fopen(path, "rb");
+}
+#endif
 
 static bool contains(uint32_t address, size_t span)
 {
@@ -78,7 +111,7 @@ bool sim_rom_load_file(SimRom *rom, const char *path)
     size_t count;
     int extra;
     if (rom == NULL || path == NULL) return false;
-    file = fopen(path, "rb");
+    file = open_binary_file(path);
     if (file == NULL) return false;
     count = fread(rom->bytes, 1u, sizeof(rom->bytes), file);
     extra = fgetc(file);
