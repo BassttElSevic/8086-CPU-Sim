@@ -10,9 +10,7 @@ CPU 的实现是本项目的核心。CPU 部分几乎完整描述了 8086 的寄
 
 <img width="1094" height="664" alt="DOS安装" src="https://github.com/user-attachments/assets/e7c054c7-13c5-400a-91cb-1055931a81d5" />
 
-
 <img width="1264" height="660" alt="Q-BASIC解释器的运行" src="https://github.com/user-attachments/assets/54f17c69-fb13-4f1d-b5b1-0f8d32984009" />
-
 
 ## 项目边界
 
@@ -69,13 +67,14 @@ SimSystem
 
 ```text
 8086-CPU-Sim/
-|-- apps/       Windows 启动器及其前端代码
+|-- apps/       启动器：Windows（Win32 图形界面）/ Linux、macOS（控制台 stub）
 |-- docs/       内核、CPU、总线和外设的设计说明
 |-- firmware/   自制 BIOS 源码、目标文件和 ROM 镜像
 |-- include/    C 头文件和模块接口
 |-- src/        CPU、内核、总线、内存和外设实现
-|-- dist/       开箱即用的编译产物和运行文件
-|-- Makefile    GCC/MinGW 构建入口
+|-- build/      构建中间目标文件（.o，可删除，已 gitignore）
+|-- dist/       构建产物（启动器、BIOS 镜像）
+|-- Makefile    跨平台构建入口（自动检测宿主平台）
 |-- README.md   项目说明
 ```
 
@@ -116,31 +115,68 @@ src/sim_system.c      整机挂载和启动配置
 
 ## 构建
 
+项目已支持跨平台构建。Makefile 会自动检测宿主平台（Windows / Linux / macOS），并选用对应的编译器、可执行后缀（`Windows` 用 `.exe`）、GUI 链接库与文件操作方式。
+
+前置依赖：`make`（GNU Make）、C 编译器（GCC / Clang / MinGW），以及 binutils 的 `as`、`objcopy`（用于把 `firmware/` 里的 `.S` 汇编成 BIOS 镜像；各平台通用）。
+
+### Linux / macOS 原生构建
+
 在仓库根目录执行：
 
 ```text
-mingw32-make
+make
 ```
 
-也可以直接编译源文件进行模块验证：
+### Windows 原生构建（MinGW）
+
+Windows 上使用 MinGW 自带的 make 执行：
+
+```text
+mingw32-make
+# 或 make（若已在 PATH 中）
+```
+
+### 在 Linux 上交叉编译 Windows 版
+
+本机装有 MinGW 交叉编译器时，指定 `TARGET` 与 `CC` 即可产出 Windows `.exe`：
+
+```text
+make TARGET=windows CC=i686-w64-mingw32-gcc
+```
+
+`TARGET` 取值：`auto`（默认，自动检测）| `windows` | `unix`。所有工具（`CC` / `AS` / `OBJCOPY`）都可在命令行覆盖。
+
+### 产物
+
+构建后在 `build/` 生成中间目标文件，并产出：
+
+```text
+apps/pc_sim_launcher(.exe)        启动器
+firmware/pc_compat_bios.bin       BIOS ROM 镜像
+dist/apps/pc_sim_launcher(.exe)   打包后的启动器
+dist/firmware/pc_compat_bios.bin  打包后的 BIOS 镜像
+```
+
+### 只做语法/模块验证与清理
 
 ```text
 gcc -std=c11 -Wall -Wextra -Wpedantic -Iinclude -c src/*.c
+make clean
 ```
+
+> 平台说明：核心 CPU、内核、外设代码均使用 `#ifdef _WIN32` + POSIX 分支，可在各平台编译运行。Windows 下的 `apps/` 是 Win32 图形界面；Linux / macOS 下 Win32 API 不可用，`apps/` 会编译成一个仅打印「仅在 Windows 可用」的控制台 stub。一个真正的跨平台图形启动器（GTK / SDL 等）属于后续工作。
 
 具体模块的接口、行为和已知限制见 `docs/`。其中 `docs/01-simulation-kernel.md` 说明时钟和提交模型，`docs/06-cpu8086.md` 说明 CPU 结构，其他文档分别说明 RAM/BUS、PIC、PIT、CGA、键盘、DMA、磁盘和 BIOS。
 
-
 ## 运行
 
-dist目录下有已经构建好的文件，可以直接启动。
+`dist/` 目录内的文件为可运行的构建产物（`make` 后自动生成），可以直接启动。
 
-构建完成后，可以启动：
+构建完成后按平台启动：
 
-```text
-apps\pc_sim_launcher.exe
-```
+- Windows：`dist\apps\pc_sim_launcher.exe`
+- Linux / macOS：`./dist/apps/pc_sim_launcher`（当前为控制台 stub，仅提示「仅在 Windows 可用」）
 
-Launcher 中选择 BIOS ROM、启动软盘镜像和可写硬盘镜像后即可观察启动流程。磁盘文件使用原始扇区镜像格式，具体容量和挂载方式以 Launcher 当前支持范围为准。
+图形启动器中选择 BIOS ROM、启动软盘镜像和可写硬盘镜像后即可观察启动流程。磁盘文件使用原始扇区镜像格式，具体容量和挂载方式以 Launcher 当前支持范围为准。
 
 项目当前的可运行范围取决于 BIOS、DOS 镜像和各行为级设备模型之间的配合。CPU 模块适合继续进行指令级和微结构级学习，整机外设部分适合进行接口替换、兼容性验证和时序实验。

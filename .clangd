@@ -1,0 +1,7 @@
+CompileFlags:
+  Add:
+    - -std=c11
+    # 注意：clangd 不支持在 .clangd 里用「相对」-I 路径 —— 它会相对源文件所在目录(如 src/)解析，
+    # 导致 -Iinclude 被解析成 src/include 而找不到头文件（clangd issue #2459）。
+    # 所以这里用绝对路径。更根本的解法是 compile_commands.json（已生成，用绝对 -I）。
+    - -I/home/bassttelsevic/8086-CPU-Sim/include
