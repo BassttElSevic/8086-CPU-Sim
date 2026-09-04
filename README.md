@@ -8,6 +8,12 @@ CPU 的实现是本项目的核心。CPU 部分几乎完整描述了 8086 的寄
 
 项目主要用于学习计算机组成原理。阅读和调试这些模块，可以把寄存器、ALU、总线、状态机、中断和存储器访问放到同一个可运行系统中观察。掌握这套结构后，可以继续在现有框架上尝试实现更复杂的处理器结构，例如超标量发射、流水线冒险处理、乱序执行、寄存器重命名和提交阶段。
 
+<img width="1094" height="664" alt="DOS安装" src="https://github.com/user-attachments/assets/e7c054c7-13c5-400a-91cb-1055931a81d5" />
+
+
+<img width="1264" height="660" alt="Q-BASIC解释器的运行" src="https://github.com/user-attachments/assets/54f17c69-fb13-4f1d-b5b1-0f8d32984009" />
+
+
 ## 项目边界
 
 8086 CPU 的实现是重中之重。CPU 使用独立的状态区保存寄存器和内部控制状态，通过逻辑周期推进状态变化，并保留总线事务的 T1、T2、T3、WAIT、T4 阶段。
@@ -124,7 +130,10 @@ gcc -std=c11 -Wall -Wextra -Wpedantic -Iinclude -c src/*.c
 
 具体模块的接口、行为和已知限制见 `docs/`。其中 `docs/01-simulation-kernel.md` 说明时钟和提交模型，`docs/06-cpu8086.md` 说明 CPU 结构，其他文档分别说明 RAM/BUS、PIC、PIT、CGA、键盘、DMA、磁盘和 BIOS。
 
+
 ## 运行
+
+dist目录下有已经构建好的文件，可以直接启动。
 
 构建完成后，可以启动：
 
