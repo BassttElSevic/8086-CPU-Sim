@@ -25,6 +25,9 @@ else
 endif
 
 TARGET ?= $(HOST)
+ifeq ($(TARGET),auto)
+  TARGET := $(HOST)
+endif
 
 # ---------- 按平台设定变量 ----------
 ifeq ($(TARGET),windows)
@@ -43,8 +46,11 @@ else
   OBJCOPY   ?= objcopy
 endif
 
-# 编译器：Windows 原生 MinGW 默认 gcc；Linux/macOS 默认 cc。命令行可覆盖。
-CC ?= $(if $(filter windows,$(TARGET)),gcc,cc)
+# 编译器：Windows 原生 MinGW 默认 gcc；Linux/macOS 默认 cc。命令行或环境变量可覆盖。
+# GNU Make 内置了 CC=cc，因此使用 origin 判断默认值，避免 ?= 被内置变量跳过。
+ifeq ($(origin CC),default)
+  CC := $(if $(filter windows,$(TARGET)),gcc,cc)
+endif
 
 CFLAGS   := -std=c11 -O2 -Wall -Wextra -Wpedantic -Iinclude
 CPPFLAGS :=
@@ -61,14 +67,20 @@ BIOS_IMAGE     := firmware/pc_compat_bios.bin
 SIM_SOURCES := $(wildcard src/*.c)
 SIM_OBJECTS := $(patsubst src/%.c,$(BUILD_DIR)/%.o,$(SIM_SOURCES))
 
-# ---------- 跨平台拷贝（打包到 dist/） ----------
+# ---------- 跨平台文件操作 ----------
 # 注意：这里的拷贝是「本机文件操作」，必须跟随 HOST（跑 make 的机器），而不是 TARGET。
 # 在 Linux 上交叉编译 Windows 版时，HOST 是 Linux，不能用 powershell。
 ifeq ($(HOST),windows)
+define MKDIR_P
+powershell.exe -NoProfile -Command "New-Item -ItemType Directory -Force -Path '$(1)' | Out-Null"
+endef
 define COPY_TO_DIST
 powershell.exe -NoProfile -Command "New-Item -ItemType Directory -Force -Path '$(1)' | Out-Null; Copy-Item -LiteralPath '$(2)' -Destination '$(3)' -Force"
 endef
 else
+define MKDIR_P
+mkdir -p $(1)
+endef
 define COPY_TO_DIST
 mkdir -p $(1) && cp $(2) $(3)
 endef
@@ -81,7 +93,7 @@ all: package
 
 # ---------- 对象 ----------
 $(BUILD_DIR)/%.o: src/%.c
-	@mkdir -p $(dir $@)
+	@$(call MKDIR_P,$(dir $@))
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $<
 
 # ---------- 启动器 ----------
