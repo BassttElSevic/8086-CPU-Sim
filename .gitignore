@@ -1,3 +1,4 @@
+
 # Local compiler outputs
 *.o
 *.obj
@@ -10,6 +11,7 @@ firmware/*.bin
 # Temporary build directories
 build/
 out/
+dist/
 
 # Editor and OS metadata
 .vscode/
