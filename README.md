@@ -116,12 +116,16 @@ src/sim_system.c      整机挂载和启动配置
 
 ## 开箱即用（免编译）
 
-不想装编译器？直接下载打包好的发行版即可 —— 解压后双击就能跑，无需任何安装。
+不想装编译器？直接下载打包好的发行版即可 —— 解压/安装后就能跑，无需任何安装。文件名带版本号 + 日期（如 `pc-sim-1.0.0-20250904`）。
 
-- **Windows**：下载 `pc_sim_launcher-win.zip`，解压后双击里面的 `pc_sim_launcher.exe`。
-- **Linux / macOS**：下载 `pc_sim_launcher-linux.tar.gz`，解压后在终端执行 `./pc_sim_launcher`。
+- **Windows**：下载 `pc-sim-<版本>-<日期>.win-x86_64.zip`，解压后双击里面的 `pc_sim_launcher.exe`。
+- **Debian / Ubuntu**：下载 `pc-sim_<版本>+<日期>_amd64.deb`，用 `sudo apt install ./<file>.deb` 安装。
+- **Red Hat / Fedora**：下载 `pc-sim-<版本>-<日期>.x86_64.rpm`，用 `sudo rpm -i <file>.rpm` 安装。
+- **Linux 通用便携**：下载 `pc-sim-<版本>-<日期>.linux-x86_64.tar.gz`，解压后在终端执行 `./pc_sim_launcher`。
 
 > 这些包由 GitHub Actions 在发布时自动构建（见 `.github/workflows/release.yml`），已内置 BIOS 镜像，**不需要编译、不需要配置**，打开即可用。请在仓库的 **Releases / 发行版** 页面下载。
+>
+> 说明：当前 **Linux 启动器是控制台 stub**（提示仅 Windows 可用），真正的开箱即用体验优先针对 Windows GUI 版；Linux 包（.deb / .rpm / .tar.gz）的打包与安装流水线已就绪，待跨平台图形启动器（GTK/SDL）落地后即可直接使用。
 
 如果你愿意自己编译，请继续看下面的「构建」章节。
 

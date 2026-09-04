@@ -1,48 +1,63 @@
 name: release
 
-# 每次打上形如 v1.0.0 的 tag，自动构建并发布“解压即用”的发行包。
-# 不需要用户安装任何编译器：Windows 包是已编译好的 GUI 启动器 + 内置 BIOS；
-# 在 Linux/CI 上用 MinGW 交叉编译，Windows 用户直接下载 .exe 即可。
+# 每次打上形如 v1.0.0 的 tag，自动构建并发布多平台、多格式的发行包。
+# 覆盖主流 Linux 发行版（Debian/Ubuntu → *.deb，Red Hat/Fedora → *.rpm，
+# 通用便携 → *.tar.gz）以及 Windows（*.zip）。文件名带版本 + 日期，并附 SHA256SUMS。
+# 不需要用户安装任何编译器。
 
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 permissions:
-  contents: write   # 允许把构建产物挂载到 GitHub Release
+  contents: write # 允许把构建产物挂载到 GitHub Release
 
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        # 固定到 commit SHA（供应安全），对应 actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
       - name: Install toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y make gcc binutils zip
-          # 交叉编译 Windows .exe 所需（项目 Makefile 支持 TARGET=windows）
+          sudo apt-get install -y make gcc binutils zip rpm
+          # 交叉编译 Windows .exe（项目 Makefile 支持 TARGET=windows）
           sudo apt-get install -y gcc-mingw-w64-i686
+
+      - name: Resolve version and date
+        id: meta
+        run: |
+          VER="${GITHUB_REF_NAME#v}"
+          echo "ver=${VER}" >> "$GITHUB_OUTPUT"
+          echo "date=$(date +%Y%m%d)" >> "$GITHUB_OUTPUT"
 
       - name: Build Linux launcher (host toolchain)
         run: |
           make clean
           make
-          rm -rf release
-          mkdir -p release/pc_sim_launcher-linux
-          cp dist/apps/pc_sim_launcher release/pc_sim_launcher-linux/
-          cp dist/firmware/pc_compat_bios.bin release/pc_sim_launcher-linux/
-          chmod +x release/pc_sim_launcher-linux/pc_sim_launcher
-          cat > release/pc_sim_launcher-linux/README.txt <<'EOF'
+          rm -rf pkg portable
+          # deb/rpm 布局：usr/bin + usr/share/pc-sim
+          mkdir -p pkg/usr/bin pkg/usr/share/pc-sim
+          cp dist/apps/pc_sim_launcher pkg/usr/bin/pc_sim_launcher
+          cp dist/firmware/pc_compat_bios.bin pkg/usr/share/pc-sim/pc_compat_bios.bin
+          chmod 755 pkg/usr/bin/pc_sim_launcher
+          # 便携 tar.gz 布局：平级放置
+          mkdir -p portable/pc-sim-linux
+          cp dist/apps/pc_sim_launcher portable/pc-sim-linux/
+          cp dist/firmware/pc_compat_bios.bin portable/pc-sim-linux/
+          chmod +x portable/pc-sim-linux/pc_sim_launcher
+          cat > portable/pc-sim-linux/README.txt <<'EOF'
           8086 CPU Simulator — 免安装、免编译，解压即用
 
           启动方式：
             Linux / macOS:   ./pc_sim_launcher
 
-          本目录已内置 BIOS 镜像（pc_compat_bios.bin），无需任何额外配置。
-          如需软盘镜像 / 虚拟硬盘，可在启动器界面里选择对应文件。
+          说明：当前 Linux 版为控制台 stub（提示仅 Windows 可用）。
+          本目录已内置 BIOS 镜像（pc_compat_bios.bin）。
           如需从源码构建，请参考项目 README。
           EOF
 
@@ -50,10 +65,10 @@ jobs:
         run: |
           make clean
           make TARGET=windows CC=i686-w64-mingw32-gcc
-          mkdir -p release/pc_sim_launcher-win
-          cp dist/apps/pc_sim_launcher.exe release/pc_sim_launcher-win/
-          cp dist/firmware/pc_compat_bios.bin release/pc_sim_launcher-win/
-          cat > release/pc_sim_launcher-win/README.txt <<'EOF'
+          mkdir -p portable/pc-sim-win
+          cp dist/apps/pc_sim_launcher.exe portable/pc-sim-win/
+          cp dist/firmware/pc_compat_bios.bin portable/pc-sim-win/
+          cat > portable/pc-sim-win/README.txt <<'EOF'
           8086 CPU Simulator — 免安装、免编译，解压即用
 
           启动方式：
@@ -64,24 +79,119 @@ jobs:
           如需从源码构建，请参考项目 README。
           EOF
 
-      - name: Archive release bundles
+      - name: Package Debian/Ubuntu (.deb)
+        env:
+          VER: ${{ steps.meta.outputs.ver }}
+          DATE: ${{ steps.meta.outputs.date }}
         run: |
-          cd release
-          zip -r ../pc_sim_launcher-win.zip pc_sim_launcher-win
-          tar czf ../pc_sim_launcher-linux.tar.gz pc_sim_launcher-linux
+          mkdir -p debroot/DEBIAN
+          cp -r pkg/. debroot/
+          cat > debroot/DEBIAN/control <<EOF
+          Package: pc-sim
+          Version: ${VER}+${DATE}
+          Section: emulators
+          Priority: optional
+          Architecture: amd64
+          Maintainer: BassttElSevic <2911312474@qq.com>
+          Depends: libc6
+          Description: 8086 CPU/PC simulator launcher
+           A cross-platform 8086 CPU and PC simulator. This package installs the
+           Linux launcher (currently a console stub) and the BIOS ROM image.
+          EOF
+          dpkg-deb --build --root-owner-group debroot "pc-sim_${VER}+${DATE}_amd64.deb"
+
+      - name: Package Red Hat/Fedora (.rpm)
+        env:
+          VER: ${{ steps.meta.outputs.ver }}
+          DATE: ${{ steps.meta.outputs.date }}
+        run: |
+          CLDATE="$(LC_ALL=C date -u '+%a %b %d %Y')"
+          rm -rf rpmbuild && mkdir -p rpmbuild/{SPECS,BUILD,BUILDROOT,RPMS,SOURCES}
+          REPO="$GITHUB_WORKSPACE"
+          cat > rpmbuild/SPECS/pc-sim.spec <<EOF
+          Name:           pc-sim
+          Version:        ${VER}
+          Release:        1.${DATE}
+          Summary:        8086 CPU/PC simulator launcher
+          License:        MIT
+          URL:            https://github.com/BassttElSevic/8086-CPU-Sim
+          BuildArch:      x86_64
+          Requires:       glibc
+
+          %description
+          A cross-platform 8086 CPU and PC simulator. This package installs the
+          Linux launcher (currently a console stub) and the BIOS ROM image.
+
+          %install
+          mkdir -p %{buildroot}/usr/bin %{buildroot}/usr/share/pc-sim
+          cp ${REPO}/pkg/usr/bin/pc_sim_launcher %{buildroot}/usr/bin/pc_sim_launcher
+          cp ${REPO}/pkg/usr/share/pc-sim/pc_compat_bios.bin %{buildroot}/usr/share/pc-sim/pc_compat_bios.bin
+
+          %files
+          /usr/bin/pc_sim_launcher
+          /usr/share/pc-sim/pc_compat_bios.bin
+
+          %changelog
+          * ${CLDATE} BassttElSevic <2911312474@qq.com> - ${VER}-1.${DATE}
+          - Initial Linux package
+          EOF
+          rpmbuild -bb --define "_topdir ${REPO}/rpmbuild" rpmbuild/SPECS/pc-sim.spec
+          cp rpmbuild/RPMS/x86_64/*.rpm "pc-sim-${VER}-1.${DATE}.x86_64.rpm"
+
+      - name: Package portable archives (.tar.gz / .zip)
+        env:
+          VER: ${{ steps.meta.outputs.ver }}
+          DATE: ${{ steps.meta.outputs.date }}
+        run: |
+          cd portable
+          tar czf "../pc-sim-${VER}-${DATE}.linux-x86_64.tar.gz" pc-sim-linux
+          zip -r "../pc-sim-${VER}-${DATE}.win-x86_64.zip" pc-sim-win
+          cd ..
+
+      - name: Generate SHA256SUMS
+        env:
+          VER: ${{ steps.meta.outputs.ver }}
+          DATE: ${{ steps.meta.outputs.date }}
+        run: |
+          sha256sum \
+            "pc-sim_${VER}+${DATE}_amd64.deb" \
+            "pc-sim-${VER}-1.${DATE}.x86_64.rpm" \
+            "pc-sim-${VER}-${DATE}.linux-x86_64.tar.gz" \
+            "pc-sim-${VER}-${DATE}.win-x86_64.zip" \
+            > SHA256SUMS
+
+      - name: Write release notes
+        env:
+          VER: ${{ steps.meta.outputs.ver }}
+          DATE: ${{ steps.meta.outputs.date }}
+        run: |
+          cat > RELEASE_BODY.md <<EOF
+          ## 8086 CPU Simulator — ${VER}（${DATE}）
+
+          免安装、免编译。下载对应平台/格式的包即可运行，**无需安装任何编译器**。
+
+          | 平台 | 格式 | 文件 | 说明 |
+          |---|---|---|---|
+          | Windows | 便携 .zip | \`pc-sim-${VER}-${DATE}.win-x86_64.zip\` | 解压后双击 \`pc_sim_launcher.exe\` |
+          | Debian/Ubuntu | .deb | \`pc-sim_${VER}+${DATE}_amd64.deb\` | \`sudo apt install ./<file>.deb\` |
+          | Red Hat/Fedora | .rpm | \`pc-sim-${VER}-${DATE}.x86_64.rpm\` | \`sudo rpm -i <file>.rpm\` |
+          | Linux 通用 | .tar.gz | \`pc-sim-${VER}-${DATE}.linux-x86_64.tar.gz\` | 解压后 \`./pc_sim_launcher\` |
+
+          所有包均内置 \`pc_compat_bios.bin\`。校验和见 \`SHA256SUMS\`。
+
+          > 说明：当前 **Linux 启动器是控制台 stub**（提示仅 Windows 可用），
+          > 真正的开箱即用体验优先针对 Windows GUI 版；Linux 包的打包流水线已就绪，
+          > 待跨平台图形启动器（GTK/SDL）落地后即可直接使用。
+          EOF
 
       - name: Publish to GitHub Release
-        uses: softprops/action-gh-release@v2
+        # 固定到 commit SHA（供应安全），对应 softprops/action-gh-release@v3（Windows 用 Node 24，v2 已 EOL）
+        uses: softprops/action-gh-release@5113cdc90fd4d541c801c55356214017bf5ae34b
         with:
           files: |
-            pc_sim_launcher-win.zip
-            pc_sim_launcher-linux.tar.gz
-          body: |
-            ## 开箱即用（免编译）
-
-            下载对应平台的压缩包，解压后按里面的 `README.txt` 双击启动即可，**无需安装任何编译器**。
-
-            - **`pc_sim_launcher-win.zip`** — Windows GUI 启动器（含内置 BIOS），解压后双击 `pc_sim_launcher.exe`。
-            - **`pc_sim_launcher-linux.tar.gz`** — Linux/macOS 启动器（当前为控制台 stub）。
-
-            两个包内部都已包含 `pc_compat_bios.bin`，BIOS 与启动器平级放置，开箱即用。
+            pc-sim_*_amd64.deb
+            pc-sim-*.x86_64.rpm
+            pc-sim-*.linux-x86_64.tar.gz
+            pc-sim-*.win-x86_64.zip
+            SHA256SUMS
+          body_path: RELEASE_BODY.md
