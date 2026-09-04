@@ -73,7 +73,8 @@ SimSystem
 |-- include/    C 头文件和模块接口
 |-- src/        CPU、内核、总线、内存和外设实现
 |-- build/      构建中间目标文件（.o，可删除，已 gitignore）
-|-- dist/       构建产物（启动器、BIOS 镜像）
+|-- dist/       本地构建产物（启动器、BIOS 镜像；已 gitignore，不提交）
+|-- .github/    GitHub Actions：打 tag 自动构建并发布 Release（开箱即用）
 |-- Makefile    跨平台构建入口（自动检测宿主平台）
 |-- README.md   项目说明
 ```
@@ -112,6 +113,21 @@ src/sim_dma.c         8237 风格 DMA 控制器
 src/sim_disk.c        软盘和硬盘扇区访问
 src/sim_system.c      整机挂载和启动配置
 ```
+
+## 开箱即用（免编译）
+
+不想装编译器？直接下载打包好的发行版即可 —— 解压/安装后就能跑，无需任何安装。文件名带版本号 + 日期（如 `pc-sim-1.0.0-20250904`）。
+
+- **Windows**：下载 `pc-sim-<版本>-<日期>.win-x86_64.zip`，解压后双击里面的 `pc_sim_launcher.exe`。
+- **Debian / Ubuntu**：下载 `pc-sim_<版本>+<日期>_amd64.deb`，用 `sudo apt install ./<file>.deb` 安装。
+- **Red Hat / Fedora**：下载 `pc-sim-<版本>-<日期>.x86_64.rpm`，用 `sudo rpm -i <file>.rpm` 安装。
+- **Linux 通用便携**：下载 `pc-sim-<版本>-<日期>.linux-x86_64.tar.gz`，解压后在终端执行 `./pc_sim_launcher`。
+
+> 这些包由 GitHub Actions 在发布时自动构建（见 `.github/workflows/release.yml`），已内置 BIOS 镜像，**不需要编译、不需要配置**，打开即可用。请在仓库的 **Releases / 发行版** 页面下载。
+>
+> 说明：当前 **Linux 启动器是控制台 stub**（提示仅 Windows 可用），真正的开箱即用体验优先针对 Windows GUI 版；Linux 包（.deb / .rpm / .tar.gz）的打包与安装流水线已就绪，待跨平台图形启动器（GTK/SDL）落地后即可直接使用。
+
+如果你愿意自己编译，请继续看下面的「构建」章节。
 
 ## 构建
 
@@ -170,13 +186,13 @@ make clean
 
 ## 运行
 
-`dist/` 目录内的文件为可运行的构建产物（`make` 后自动生成），可以直接启动。
+`dist/` 是本地构建产物目录（`make` 后自动生成，已 gitignore），**不随仓库提交**。作为最终用户，建议直接下载上方「开箱即用」章节里的 Release 包。
 
-构建完成后按平台启动：
+自己编译后按平台启动：
 
-- Windows：`dist\apps\pc_sim_launcher.exe`
+- Windows：`dist\apps\pc_sim_launcher.exe`（双击即可，BIOS 自动加载）
 - Linux / macOS：`./dist/apps/pc_sim_launcher`（当前为控制台 stub，仅提示「仅在 Windows 可用」）
 
-图形启动器中选择 BIOS ROM、启动软盘镜像和可写硬盘镜像后即可观察启动流程。磁盘文件使用原始扇区镜像格式，具体容量和挂载方式以 Launcher 当前支持范围为准。
+图形启动器中可选择 BIOS ROM、启动软盘镜像和可写硬盘镜像后观察启动流程。磁盘文件使用原始扇区镜像格式，具体容量和挂载方式以 Launcher 当前支持范围为准。
 
 项目当前的可运行范围取决于 BIOS、DOS 镜像和各行为级设备模型之间的配合。CPU 模块适合继续进行指令级和微结构级学习，整机外设部分适合进行接口替换、兼容性验证和时序实验。

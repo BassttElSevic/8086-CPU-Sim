@@ -12,12 +12,14 @@
 *.class
 tests/*.exe
 apps/*_test.exe
+apps/pc_sim_launcher
 firmware/*.bin
 
 # ============ 构建目录 / 编译数据库 ============
 build/
 out/
 dist/
+release/
 cmake-build-*/
 CMakeFiles/
 CMakeCache.txt
