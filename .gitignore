@@ -1,0 +1,19 @@
+# Local compiler outputs
+*.o
+*.obj
+*.exe
+*.out
+tests/*.exe
+apps/*_test.exe
+firmware/*.bin
+
+# Temporary build directories
+build/
+out/
+
+# Editor and OS metadata
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+Desktop.ini
