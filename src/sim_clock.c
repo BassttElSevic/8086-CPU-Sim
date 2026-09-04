@@ -1,3 +1,9 @@
+// 在严格 C11 (-std=c11) 下，glibc 默认不暴露 POSIX 接口（如 clock_gettime）。
+// 特性测试宏必须在任何系统头文件之前定义，仅在非 Windows 需要。
+#if !defined(_WIN32) && !defined(_POSIX_C_SOURCE)
+#define _POSIX_C_SOURCE 199309L
+#endif
+
 #include "sim/sim_clock.h"
 
 #include <string.h>

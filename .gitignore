@@ -1,21 +1,58 @@
-
-# Local compiler outputs
+# ============ 编译产物 ============
 *.o
 *.obj
+*.a
+*.lib
+*.so
+*.so.*
+*.dll
+*.dylib
 *.exe
 *.out
+*.class
 tests/*.exe
 apps/*_test.exe
 firmware/*.bin
 
-# Temporary build directories
+# ============ 构建目录 / 编译数据库 ============
 build/
 out/
 dist/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+CMakeLists.txt.user
+compile_commands.json
+compile_commands.json.tmp
+compile_flags.txt
 
-# Editor and OS metadata
+# ============ 临时 / 备份文件 ============
+*.swp
+*.swo
+*.swn
+*.tmp
+*~
+*.bak
+*.orig
+
+# ============ 编辑器 / IDE ============
 .vscode/
 .idea/
-*.swp
+.vim/
+tags
+TAGS
+
+# ============ 操作系统杂项 ============
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Trashes/
 Thumbs.db
 Desktop.ini
+$RECYCLE.BIN/
+
+# ============ Python（若有测试/脚本） ============
+__pycache__/
+*.py[cod]
+.Python
