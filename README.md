@@ -1,113 +1,137 @@
-# 8086-PC-Sim
+# 8086-CPU-Sim
 
-This repository contains a from-scratch, clocked C simulation of an 8086-based general-purpose PC. The long-term system target is to boot a legally obtained DOS disk image through a self-written BIOS. Existing emulators are not used as runtime components.
+## 项目目的
 
-## Current milestone
+本项目使用 C 语言，在寄存器级别模拟一颗 8086 CPU，并为它提供可以运行 DOS 的最小 PC 环境。
 
-The synchronous simulation kernel is complete and the assembled PC can boot a
-FreeDOS floppy image through `firmware/pc_compat_bios.S`. The verified path is
-the 8086 CPU, BUS, RAM/ROM, CGA text adapter, 8042-style keyboard controller,
-8259 PIC, 8253 PIT, and ATA PIO disk controller. No external emulator is used
-at runtime.
+CPU 的实现是本项目的核心。CPU 部分几乎完整描述了 8086 的寄存器、指令执行所需的逻辑单元和内部控制关系，并模拟取指、译码、执行、总线访问、BIU/EU 协作以及相关时序行为。代码用于展示一条指令如何经过数据通路和控制逻辑，最终改变寄存器、Flags、内存或外设状态。
 
-The foundation remains the kernel:
+项目主要用于学习计算机组成原理。阅读和调试这些模块，可以把寄存器、ALU、总线、状态机、中断和存储器访问放到同一个可运行系统中观察。掌握这套结构后，可以继续在现有框架上尝试实现更复杂的处理器结构，例如超标量发射、流水线冒险处理、乱序执行、寄存器重命名和提交阶段。
 
-- deterministic logical clock;
-- current-state/next-state register protocol;
-- combinational 16-bit adder with 8086-relevant flags;
-- clocked T1/T2/T3/WAIT/T4 BUS transaction state machine;
-- BUS-mounted byte-addressed RAM with configurable wait states and T4 writes;
-- no external C library dependencies beyond the standard C library.
+## 项目边界
 
-Temporary test drivers and build products belong in the working directory used for development, not in this repository. The formal source is under `include/` and `src/`. The module dependency and data-flow diagrams are in `docs/02-module-map.md`. The formal C-file boundary plan is in `docs/03-formal-file-plan.md`. The State/Kernel/Trace/BUS interface contract is in `docs/04-core-interface-contract.md`. The RAM/BUS compatibility contract is in `docs/05-ram-bus-compatible-contract.md`.
+8086 CPU 的实现是重中之重。CPU 使用独立的状态区保存寄存器和内部控制状态，通过逻辑周期推进状态变化，并保留总线事务的 T1、T2、T3、WAIT、T4 阶段。
 
-The first interrupt-controller model is documented in
-`docs/08-pic8259-behavior.md`. It is a single-chip behavioral 8259A mounted at
-I/O ports `20h/21h` and connected to the CPU through two BUS INTA transactions.
-The PIT model and its clock-ratio contract are documented in
-`docs/09-pit8253-behavior.md`.
+其他模块承担运行环境的职责，采用“能用则行”的行为级模型，目标是满足当前 CPU、BIOS 和 DOS 启动流程的接口要求。RAM、BUS、PIC、PIT、CGA、键盘、DMA 和磁盘控制器都可以替换。使用者可以寻找更精良的外设实现，将它们挂接到现有的总线和状态接口上。
 
-The BIOS contract and its FreeDOS boot acceptance evidence are in
-`docs/13-pc-compatible-bios.md`.
+BIOS 位于 `firmware/`。它是项目自制的 BIOS，几乎只能完成一个 DOS 安装软盘的引导和安装流程。它只兼容仓库中已有的 CPU、RAM、CGA、键盘、PIC、PIT、DMA 和磁盘控制器，没有实现对更多真实 PC 外设的兼容，不能当作通用 BIOS 使用。
 
-## Build the current source
+Launcher 位于 `apps/`，目前属于半成品。它提供 CGA 文本显示、键盘输入、BIOS/软盘/硬盘选择和启动控制，方便观察启动流程。它不具备模拟真实微机系统并提供精准时钟节拍的能力，也不尝试精确维持约 4.77 MHz 的运行速度。Launcher 在 Windows 窗口事务中推进模拟器：默认每次 GUI 轮询推进 2048 个 ticks，速度选项通过调整每次批量推进的 ticks 数量实现。
 
-From the repository root:
+## 系统架构
 
 ```text
-gcc -std=c11 -Wall -Wextra -Wpedantic -Iinclude -c src/sim_state.c src/sim_trace.c src/sim_kernel.c src/sim_bus.c src/sim_ram.c src/sim_pic.c src/sim_pit.c
+Launcher
+    |
+    v
+SimSystem
+    |
+    +-- SimKernel ---- SimState / SimTrace
+    |
+    +-- CPU8086
+    |       +-- CPU8086State
+    |       +-- BIU / Prefetch
+    |       +-- EU / Decoder / EA
+    |       +-- ALU / Shifter / MulDiv / BCD
+    |       +-- Interrupt and control logic
+    |
+    +-- SimBus
+    |       +-- SimRam / SimRom
+    |       +-- SimCga
+    |       +-- SimKeyboard
+    |       +-- SimPic / SimPit
+    |       +-- SimDma
+    |       +-- SimDisk
+    |
+    +-- Firmware ROM and DOS disk images
 ```
 
-The project is intentionally small enough that the simulation sources can still
-be compiled directly, while the repository Makefile builds the BIOS and the
-Windows launcher as stable executable boundaries.
-
-## Run FreeDOS interactively
-
-On Windows, build the system ROM and the graphical launcher from the repository
-root:
+每个逻辑周期遵循以下顺序：
 
 ```text
-C:\MinGW\bin\mingw32-make.exe firmware launcher
+读取 current 状态
+    -> 模块求值并产生请求、响应和 next 状态
+    -> BUS 推进当前事务阶段
+    -> T4 提交总线目标的写入副作用
+    -> rising edge / commit
+    -> 进入下一周期的 current 状态
 ```
 
-Run the launcher:
+模块通过 `SimModule` 挂接到 `SimKernel`，总线设备通过 `SimBusTarget` 注册到 `SimBus`。公共状态由 `SimState` 的状态区域保存。模块在求值阶段读取当前状态，在提交阶段写入下一状态，避免模块调用顺序改变结果。
+
+## 目录结构
 
 ```text
-.\apps\pc_sim_launcher.exe
+8086-CPU-Sim/
+|-- apps/       Windows 启动器及其前端代码
+|-- docs/       内核、CPU、总线和外设的设计说明
+|-- firmware/   自制 BIOS 源码、目标文件和 ROM 镜像
+|-- include/    C 头文件和模块接口
+|-- src/        CPU、内核、总线、内存和外设实现
+|-- dist/       开箱即用的编译产物和运行文件
+|-- Makefile    GCC/MinGW 构建入口
+|-- README.md   项目说明
 ```
 
-The window contains a CGA display and media controls. Select a BIOS ROM, use
-`Browse...` for a raw 360 KB or 1.44 MB floppy image in A:, use `Browse...` or `New...`
-for the writable C: raw disk, and press `Mount / Restart`. The launcher also
-accepts the old command-line selections as initial values:
+CPU 源文件主要包括：
 
 ```text
-.\apps\pc_sim_launcher.exe --floppy "D:\path\to\installer.img" --create-hdd "D:\path\to\dos-hdd.img"
+src/cpu8086.c
+src/cpu8086_state.c
+src/cpu8086_biu.c
+src/cpu8086_prefetch.c
+src/cpu8086_eu.c
+src/cpu8086_decoder.c
+src/cpu8086_ea.c
+src/cpu8086_alu.c
+src/cpu8086_shifter.c
+src/cpu8086_muldiv.c
+src/cpu8086_bcd.c
 ```
 
-After installation, reboot from the persistent hard disk without mounting a
-floppy:
+内核和平台设备主要包括：
 
 ```text
-.\apps\pc_sim_launcher.exe --hdd "D:\path\to\dos-hdd.img"
+src/sim_state.c       状态区域和 current/next 状态
+src/sim_kernel.c      逻辑周期和统一提交
+src/sim_trace.c       周期、事务和状态变化记录
+src/sim_bus.c         总线仲裁、阶段推进和设备访问
+src/sim_ram.c         RAM 行为模型
+src/sim_rom.c         ROM 行为模型
+src/sim_pic.c         8259A 行为模型
+src/sim_pit.c         8253 行为模型
+src/sim_cga.c         CGA 寄存器和显存模型
+src/sim_cga_console.c Windows CGA 显示窗口
+src/sim_keyboard.c    8042 风格键盘控制器
+src/sim_dma.c         8237 风格 DMA 控制器
+src/sim_disk.c        软盘和硬盘扇区访问
+src/sim_system.c      整机挂载和启动配置
 ```
 
-The C: `New...` action immediately creates a zero-filled 126 MiB `256 x 16 x 63`
-raw image at the selected new path. It does not overwrite an existing file;
-subsequent simulated writes are flushed back when the machine exits. To boot an installed disk without a
-floppy, select only the C: image in the window, or use the command above.
+## 构建
 
-The launcher renders the simulated text VRAM directly in the central native
-80x25 CGA area and routes ordinary US-layout letters, digits, punctuation,
-Enter, Backspace, Tab, Escape, and navigation keys through the simulated 8042
-keyboard controller. Close the launcher window to stop the machine; a mounted
-writable C: image is flushed back to its selected raw file at that point.
-
-The disk files are raw sector images, not VHD/QCOW/VDI containers. A: accepts
-standard 160 KiB, 180 KiB, 320 KiB, 360 KiB, 640 KiB, 720 KiB, 1.2 MiB,
-1.44 MiB, and 2.88 MiB images, reads a valid FAT BPB for nonstandard media,
-and accepts other 512-byte-aligned sizes that can be represented as two heads
-with 1-63 sectors per track. C: must be exactly
-`256 x 16 x 63 x 512` bytes (126 MiB).
-
-DOS 5.0's stock `CONFIG.SYS` loads `HIMEM.SYS` and requests `DOS=HIGH`, which
-requires an 80286-compatible HMA path. For this 8086 machine, use a derived
-boot image with that driver disabled and `DOS=LOW` (the project test image is
-`artifacts/Dos5.0_8086.img`). The original image is not modified.
-
-## Simulation rule
-
-Every cycle has two phases:
+在仓库根目录执行：
 
 ```text
-evaluate current state -> commit all next state at the rising edge
+mingw32-make
 ```
 
-Modules must not modify architectural state during evaluation. This rule is the foundation for the later 8086 data path, BIU/EU control, bus transactions, and peripherals. BUS targets may stage a response in T3/WAIT, but writes become visible only when the T4 transaction is finalized at the simulated rising edge.
+也可以直接编译源文件进行模块验证：
 
-The graphical launcher currently uses a fixed simulation batch for interactive
-responsiveness: 1x executes 2,048 logical rising edges per GUI poll, while 2x,
-4x, and 8x scale that batch. The independent `SimClock` remains available for
-future host-time pacing, but is not used by the default launcher because the
-current full-system tick cost cannot sustain a physical 4.77 MHz rate.
+```text
+gcc -std=c11 -Wall -Wextra -Wpedantic -Iinclude -c src/*.c
+```
+
+具体模块的接口、行为和已知限制见 `docs/`。其中 `docs/01-simulation-kernel.md` 说明时钟和提交模型，`docs/06-cpu8086.md` 说明 CPU 结构，其他文档分别说明 RAM/BUS、PIC、PIT、CGA、键盘、DMA、磁盘和 BIOS。
+
+## 运行
+
+构建完成后，可以启动：
+
+```text
+apps\pc_sim_launcher.exe
+```
+
+Launcher 中选择 BIOS ROM、启动软盘镜像和可写硬盘镜像后即可观察启动流程。磁盘文件使用原始扇区镜像格式，具体容量和挂载方式以 Launcher 当前支持范围为准。
+
+项目当前的可运行范围取决于 BIOS、DOS 镜像和各行为级设备模型之间的配合。CPU 模块适合继续进行指令级和微结构级学习，整机外设部分适合进行接口替换、兼容性验证和时序实验。
