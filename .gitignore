@@ -28,10 +28,10 @@ compile_commands.json
 compile_commands.json.tmp
 compile_flags.txt
 
-# ===== cnm,去tmd版权，傻逼ai
-
+# ============ 本地测试用磁盘镜像（版权/过大，不提交） ============
+imagefile/
 /test.img
-
+/another
 
 # ============ 临时 / 备份文件 ============
 *.swp
