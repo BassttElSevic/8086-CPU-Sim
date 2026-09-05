@@ -147,8 +147,8 @@ jobs:
       - name: Install Qt (MinGW)
         uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730
         with:
-          version: '6.8.*'
-          arch: 'win64_mingw'
+          version: "6.8.*"
+          arch: "win64_mingw"
           cache: true
 
       - name: Build Windows launcher (Qt GUI)
@@ -188,12 +188,13 @@ jobs:
           EOF
 
       - name: Zip Windows package
-        shell: bash
+        shell: pwsh
         env:
           VER: ${{ github.ref_name }}
         run: |
-          mkdir -p ../out
-          ( cd portable && zip -r "../pc-sim-${VER#v}-$(date +%Y%m%d).win-x86_64.zip" pc-sim-win )
+          $ver = $env:VER.Substring(1)
+          $date = Get-Date -Format "yyyyMMdd"
+          Compress-Archive -Path portable/pc-sim-win/* -DestinationPath "pc-sim-$ver-$date.win-x86_64.zip"
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -211,11 +212,13 @@ jobs:
       - name: Install Qt (clang_64)
         uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730
         with:
-          version: '6.8.*'
-          arch: 'clang_64'
+          version: "6.8.*"
+          arch: "clang_64"
           cache: true
 
-      - name: Build macOS launcher (Qt GUI)
+      - name: Build macOS launcher (Qt GUI) + make .app
+        env:
+          VER: ${{ github.ref_name }}
         run: |
           QT_INC="$(qmake -query QT_INSTALL_HEADERS)"
           QT_LIB="$(qmake -query QT_INSTALL_LIBS)"
@@ -224,28 +227,44 @@ jobs:
           export QT_CXX="clang++"
           make clean
           make FE=qt CC=cc CXX=clang++
-          mkdir -p portable/pc-sim-mac
-          cp dist/apps/pc_sim_launcher portable/pc-sim-mac/
-          cp dist/firmware/pc_compat_bios.bin portable/pc-sim-mac/
-
-      - name: Bundle Qt runtime (macdeployqt)
-        run: |
-          # macdeployqt 把一个 Qt 可执行文件打成一个可运行的 .app 并内嵌框架。
-          macdeployqt portable/pc-sim-mac/pc_sim_launcher -dylib -always-overwrite || true
-          cat > portable/pc-sim-mac/README.txt <<'EOF'
-          8086 CPU Simulator — 免安装、免编译，解压即用
-
-          启动方式：./pc_sim_launcher （Qt6 框架已随包内嵌；若失败请改用 Homebrew
-          安装 qt 后，在本目录执行: ./pc_sim_launcher）
-
-          本目录已内置 BIOS 镜像（pc_compat_bios.bin）。
+          # 先包成标准的 macOS .app 目录结构，macdeployqt 才能把 Qt 框架内嵌、实现双击即用。
+          APPDIR="portable/pc-sim-mac/pc_sim_launcher.app"
+          mkdir -p "$APPDIR/Contents/MacOS" "$APPDIR/Contents/Resources"
+          cp dist/apps/pc_sim_launcher "$APPDIR/Contents/MacOS/pc_sim_launcher"
+          # BIOS 放在可执行文件旁，使 .app 被双击时能通过 applicationDirPath() 找到。
+          cp dist/firmware/pc_compat_bios.bin "$APPDIR/Contents/MacOS/pc_compat_bios.bin"
+          chmod +x "$APPDIR/Contents/MacOS/pc_sim_launcher"
+          VER="${VER#v}"
+          cat > "$APPDIR/Contents/Info.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>CFBundleName</key><string>pc_sim_launcher</string>
+            <key>CFBundleDisplayName</key><string>8086 PC Simulator</string>
+            <key>CFBundleExecutable</key><string>pc_sim_launcher</string>
+            <key>CFBundleIdentifier</key><string>io.github.bassttelsevic.pcsim</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+            <key>CFBundleShortVersionString</key><string>${VER}</string>
+            <key>CFBundleVersion</key><string>${VER}</string>
+            <key>NSHighResolutionCapable</key><true/>
+          </dict></plist>
           EOF
 
-      - name: Tar macOS package
+      - name: Bundle Qt runtime (macdeployqt) + package
         env:
           VER: ${{ github.ref_name }}
         run: |
-          mkdir -p ../out
+          APPDIR="portable/pc-sim-mac/pc_sim_launcher.app"
+          # macdeployqt 默认把 Qt 框架/插件复制进 .app/Contents/Frameworks 并修好 rpath
+          # （Qt6 框架构建用默认行为即可）。
+          macdeployqt "$APPDIR"
+          cat > portable/pc-sim-mac/README.txt <<'EOF'
+          8086 CPU Simulator (macOS) — 解压即用
+
+          启动方式：双击 pc_sim_launcher.app（Qt6 运行时已随包内嵌，无需安装 Qt）
+          本目录已内置 BIOS 镜像（pc_compat_bios.bin）。
+          EOF
           ( cd portable && tar czf "../pc-sim-${VER#v}-$(date +%Y%m%d).macos-x86_64.tar.gz" pc-sim-mac )
 
       - name: Upload macOS artifacts
@@ -292,6 +311,9 @@ jobs:
 
   release:
     needs: [linux, windows, macos, arch]
+    # 即使某个平台 job 失败/被跳过（win/mac/arch 是 continue-on-error、非阻塞），
+    # 也确保 release 能运行并发布 Linux（至少），其余平台产物能带则带。
+    if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Download all platform artifacts
