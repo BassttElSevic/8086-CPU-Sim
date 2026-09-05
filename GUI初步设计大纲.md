@@ -94,25 +94,21 @@
 
 ### 2.1 分层模型（三层）
 
-```
-+--------------------------------------------------------------+
-| 前端层（Frontend）：纯展示。                                   |
-|   窗口、控件、渲染、动画、文件对话框、键码到扫描码、定时器。      |
-|   不包含模拟逻辑，不直接访问引擎内部。                           |
-+------------------------------+-------------------------------+
-                               | 调用前端 API（extern "C"）
-+------------------------------+-------------------------------+
-| 前端 API / 控制器（Frontend API）：唯一交互边界。                 |
-|   生命周期、运行切片、单步、帧、CPU 快照、追踪、内存读取、        |
-|   状态上报、媒体与速度配置。                                    |
-+------------------------------+-------------------------------+
-                               | 读写可移植引擎
-+------------------------------+-------------------------------+
-| 引擎库 libsim（纯 C）：                                        |
-|   SimSystem、CPU、内核、总线、RAM/ROM、PIC/PIT/CGA/DMA/磁盘/键盘。|
-|   可移植 CGA 渲染器。                                           |
-|   CPU/内核/总线/外设逻辑零平台头；文件I/O与计时为可移植胶水。    |
-+--------------------------------------------------------------+
+```mermaid
+flowchart TD
+    Frontend["前端层（Frontend）：纯展示<br/>窗口、控件、渲染、动画、文件对话框、键码到扫描码、定时器<br/>不包含模拟逻辑，不直接访问引擎内部"]
+    API["前端 API / 控制器（Frontend API）：唯一交互边界<br/>生命周期、运行切片、单步、帧、CPU 快照、追踪、内存读取<br/>状态上报、媒体与速度配置"]
+    Engine["引擎库 libsim（纯 C）<br/>SimSystem、CPU、内核、总线、RAM/ROM、PIC/PIT/CGA/DMA/磁盘/键盘<br/>可移植 CGA 渲染器<br/>CPU/内核/总线/外设逻辑零平台头；文件 I/O 与计时为可移植胶水"]
+
+    Frontend -->|"调用前端 API（extern C）"| API
+    API -->|"读写可移植引擎"| Engine
+
+    classDef frontend fill:#f4eefb,stroke:#7a4ac8,stroke-width:1.5px,color:#2a1a4a
+    classDef api fill:#eef2fb,stroke:#4a78c8,stroke-width:1.5px,color:#1a2b4a
+    classDef engine fill:#eefaf2,stroke:#4a9a6a,stroke-width:1.5px,color:#173322
+    class Frontend frontend
+    class API api
+    class Engine engine
 ```
 
 ### 2.2 边界规则
