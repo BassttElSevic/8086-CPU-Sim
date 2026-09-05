@@ -91,7 +91,14 @@ AR ?= ar
 # ---------- 前端选择 ----------
 FE       ?= auto
 QT_PKG   := Qt6Widgets
-HAVE_QT  := $(shell pkg-config --exists $(QT_PKG) 2>/dev/null && echo yes || echo no)
+
+# 默认用 pkg-config 探测并取编译/链接参数；跨平台 CI（Windows/macOS 可能无 pkg-config）
+# 可通过环境变量 QT_CFLAGS / QT_LIBS 显式覆盖。
+QT_CFLAGS ?= $(shell pkg-config --cflags $(QT_PKG) 2>/dev/null)
+QT_LIBS   ?= $(shell pkg-config --libs $(QT_PKG) 2>/dev/null) -pthread
+
+# 判定 Qt 是否可用：pkg-config 给出参数，或外部用 QT_CFLAGS/QT_LIBS 显式提供。
+HAVE_QT := $(if $(strip $(QT_CFLAGS) $(QT_LIBS)),yes,no)
 
 ifeq ($(FE),auto)
   ifeq ($(TARGET),$(HOST))
@@ -139,8 +146,7 @@ libsim: $(LIB_SIM)
 
 # ---------- Qt 前端 ----------
 QT_CXX       ?= g++
-QT_CXXFLAGS  := -std=c++17 $(OPTIMIZE) -Wall -Wextra -Iinclude $(shell pkg-config --cflags $(QT_PKG) 2>/dev/null)
-QT_LIBS      := $(shell pkg-config --libs $(QT_PKG) 2>/dev/null) -pthread
+QT_CXXFLAGS  = -std=c++17 $(OPTIMIZE) -Wall -Wextra -Iinclude $(QT_CFLAGS)
 QT_SOURCES   := $(wildcard apps/frontend-qt/*.cpp)
 QT_OBJECTS   := $(patsubst apps/frontend-qt/%.cpp,$(BUILD_DIR)/qt/%.o,$(QT_SOURCES))
 # 升级后的前端复用「启动器」这个产物名，作为跨平台 GUI 的默认形态。
