@@ -20,7 +20,7 @@ CPU 的实现是本项目的核心。CPU 部分几乎完整描述了 8086 的寄
 
 BIOS 位于 `firmware/`。它是项目自制的 BIOS，几乎只能完成一个 DOS 安装软盘的引导和安装流程。它只兼容仓库中已有的 CPU、RAM、CGA、键盘、PIC、PIT、DMA 和磁盘控制器，没有实现对更多真实 PC 外设的兼容，不能当作通用 BIOS 使用。
 
-Launcher 位于 `apps/`，目前属于半成品。它提供 CGA 文本显示、键盘输入、BIOS/软盘/硬盘选择和启动控制，方便观察启动流程。它不具备模拟真实微机系统并提供精准时钟节拍的能力，也不尝试精确维持约 4.77 MHz 的运行速度。Launcher 在 Windows 窗口事务中推进模拟器：默认每次 GUI 轮询推进 2048 个 ticks，速度选项通过调整每次批量推进的 ticks 数量实现。
+前端位于 `apps/`。当前默认前端是跨平台 Qt6 GUI（`apps/frontend-qt/`，仅通过前端 API `sim_frontend.h` 与引擎交互），提供 CGA 显示、键盘、BIOS/软盘/硬盘选择与启动控制。它不模拟真实微机系统精准时钟节拍，也不尝试精确维持约 4.77 MHz 速度；每次 GUI 轮询推进 2048 个 ticks，倍速通过调整批量推进量实现。旧的 Win32 前端（`apps/pc_sim_launcher.c` / `src/sim_cga_console.c`）保留用于参考，但不再由默认构建生成。
 
 ## 系统架构
 
@@ -67,7 +67,7 @@ SimSystem
 
 ```text
 8086-CPU-Sim/
-|-- apps/       启动器：Windows（Win32 图形界面）/ Linux、macOS（控制台 stub）
+|-- apps/       前端：跨平台 Qt6 GUI（apps/frontend-qt/）；旧 Win32 启动器保留作参考
 |-- docs/       内核、CPU、总线和外设的设计说明
 |-- firmware/   自制 BIOS 源码、目标文件和 ROM 镜像
 |-- include/    C 头文件和模块接口
@@ -125,7 +125,7 @@ src/sim_system.c      整机挂载和启动配置
 
 > 这些包由 GitHub Actions 在发布时自动构建（见 `.github/workflows/release.yml`），已内置 BIOS 镜像，**不需要编译、不需要配置**，打开即可用。请在仓库的 **Releases / 发行版** 页面下载。
 >
-> 说明：当前 **Linux 启动器是控制台 stub**（提示仅 Windows 可用），真正的开箱即用体验优先针对 Windows GUI 版；Linux 包（.deb / .rpm / .tar.gz）的打包与安装流水线已就绪，待跨平台图形启动器（GTK/SDL）落地后即可直接使用。
+> 跨平台 Qt6 前端替换了旧的 Win32 启动器，使 Linux / macOS / Windows 都能获得真实的图形界面；打包流水线仍在按平台补齐（见设计大纲第 7 章）。
 
 如果你愿意自己编译，请继续看下面的「构建」章节。
 
@@ -134,6 +134,14 @@ src/sim_system.c      整机挂载和启动配置
 项目已支持跨平台构建。Makefile 会自动检测宿主平台（Windows / Linux / macOS），并选用对应的编译器、可执行后缀（`Windows` 用 `.exe`）、GUI 链接库与文件操作方式。
 
 前置依赖：`make`（GNU Make）、C 编译器（GCC / Clang / MinGW），以及 binutils 的 `as`、`objcopy`（用于把 `firmware/` 里的 `.S` 汇编成 BIOS 镜像；各平台通用）。
+
+构建 Qt 前端还需 Qt6（`Qt6Widgets`/`Qt6Gui`/`Qt6Core`，用 `pkg-config` 定位）。`FE` 变量控制前端：
+
+- `FE=auto`（默认）：源码工具链齐全时构建 Qt 前端，否则只构建引擎库。
+- `FE=qt`：强制构建 Qt 前端。
+- `FE=none`：只构建引擎库 `build/libsim.a` + 固件（无 GUI）。
+
+引擎库 `libsim.a` 为纯 C，已把旧的 Win32/GDI CGA 显示模块从引擎库中剔除（见 `src/sim_cga_console.c`，保留供参考），因此可在各平台编译。
 
 ### Linux / macOS 原生构建
 
@@ -162,14 +170,16 @@ make TARGET=windows CC=i686-w64-mingw32-gcc
 
 `TARGET` 取值：`auto`（默认，自动检测）| `windows` | `unix`。所有工具（`CC` / `AS` / `OBJCOPY`）都可在命令行覆盖。
 
+> 交叉编译（如 Linux → Windows 引擎库）默认只构建 `libsim`，不构建带 GUI 的前端；Qt 前端在各平台原生构建。
+
 ### 产物
 
-构建后在 `build/` 生成中间目标文件，并产出：
+构建后在 `build/` 生成中间目标文件与 `build/libsim.a`，并产出：
 
 ```text
-apps/pc_sim_launcher(.exe)        启动器
+apps/pc_sim_launcher(.exe)        前端（Qt6）
 firmware/pc_compat_bios.bin       BIOS ROM 镜像
-dist/apps/pc_sim_launcher(.exe)   打包后的启动器
+dist/apps/pc_sim_launcher(.exe)   打包后的前端
 dist/firmware/pc_compat_bios.bin  打包后的 BIOS 镜像
 ```
 
@@ -180,7 +190,7 @@ gcc -std=c11 -Wall -Wextra -Wpedantic -Iinclude -c src/*.c
 make clean
 ```
 
-> 平台说明：核心 CPU、内核、外设代码均使用 `#ifdef _WIN32` + POSIX 分支，可在各平台编译运行。Windows 下的 `apps/` 是 Win32 图形界面；Linux / macOS 下 Win32 API 不可用，`apps/` 会编译成一个仅打印「仅在 Windows 可用」的控制台 stub。一个真正的跨平台图形启动器（GTK / SDL 等）属于后续工作。
+> 平台说明：核心引擎（CPU、内核、总线、外设）为纯 C，除 `sim_disk`/`sim_rom`/`sim_clock` 的文件 I/O 与计时胶水外不含平台头。前端为 Qt6（Core/Gui/Widgets），在 Linux / macOS / Windows 原生构建，不依赖 Win32 API。
 
 具体模块的接口、行为和已知限制见 `docs/`。其中 `docs/01-simulation-kernel.md` 说明时钟和提交模型，`docs/06-cpu8086.md` 说明 CPU 结构，其他文档分别说明 RAM/BUS、PIC、PIT、CGA、键盘、DMA、磁盘和 BIOS。
 
@@ -191,7 +201,9 @@ make clean
 自己编译后按平台启动：
 
 - Windows：`dist\apps\pc_sim_launcher.exe`（双击即可，BIOS 自动加载）
-- Linux / macOS：`./dist/apps/pc_sim_launcher`（当前为控制台 stub，仅提示「仅在 Windows 可用」）
+- Linux / macOS：`./dist/apps/pc_sim_launcher`
+
+命令行可传 `--bios`、`--floppy`、`--hdd`、`--create-hdd`，以及 `--run`（启动即用所选介质挂载运行）。
 
 图形启动器中可选择 BIOS ROM、启动软盘镜像和可写硬盘镜像后观察启动流程。磁盘文件使用原始扇区镜像格式，具体容量和挂载方式以 Launcher 当前支持范围为准。
 

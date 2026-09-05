@@ -28,6 +28,11 @@ compile_commands.json
 compile_commands.json.tmp
 compile_flags.txt
 
+# ===== cnm,去tmd版权，傻逼ai
+
+/test.img
+
+
 # ============ 临时 / 备份文件 ============
 *.swp
 *.swo

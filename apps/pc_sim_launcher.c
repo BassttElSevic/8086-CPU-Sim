@@ -422,6 +422,7 @@ static bool save_and_destroy_system(LauncherUi *ui)
         report_error(ui->window, L"Unable to write the mounted virtual disk image.");
         saved = false;
     }
+    sim_cga_console_destroy(&ui->system.cga);
     sim_system_destroy(&ui->system);
     ui->system_ready = false;
     ui->hdd_should_flush = false;
@@ -608,6 +609,7 @@ static bool mount_selected_media(LauncherUi *ui)
     return true;
 
 failed:
+    sim_cga_console_destroy(&ui->system.cga);
     sim_system_destroy(&ui->system);
     ui->system_ready = false;
     ui->hdd_should_flush = false;

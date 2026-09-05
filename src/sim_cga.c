@@ -2,7 +2,6 @@
 
 #include <string.h>
 
-#include "sim/sim_cga_console.h"
 #include "sim/sim_state.h"
 
 enum {
@@ -172,6 +171,11 @@ static void initialize_text_crtc(SimCgaState *state)
 }
 
 static void reset(void *instance, SimState *state) { SimCga *cga = instance; SimCgaState value = {0}; if (cga == NULL) return; initialize_text_crtc(&value); *(SimCgaState *)sim_state_region_current(state, cga->state_region) = value; *(SimCgaState *)sim_state_region_next(state, cga->state_region) = value; }
-static void destroy(void *instance) { sim_cga_console_destroy((SimCga *)instance); }
+static void destroy(void *instance)
+{
+    /* The portable CGA renderer (sim_cga_render) needs no host console.
+     * Console/window coupling, if any, lives in the frontend layer only. */
+    (void)instance;
+}
 SimBusTarget sim_cga_bus_target(SimCga *cga, const char *name, uint32_t target_id) { SimBusTarget target = {0}; target.name = name; target.target_id = target_id; target.instance = cga; target.probe = probe; target.evaluate = evaluate; target.commit = commit; return target; }
 bool sim_cga_attach(SimCga *cga, SimKernel *kernel) { SimCgaState reset_value = {0}; SimModule module = {0}; if (cga == NULL || kernel == NULL || cga->attached) return false; initialize_text_crtc(&reset_value); if (!sim_state_add_region(kernel->state, "cga", sizeof(reset_value), &reset_value, &cga->state_region)) return false; cga->attached = true; module.name = "cga"; module.instance = cga; module.reset = reset; module.sample = sample; module.destroy = destroy; return sim_kernel_attach_module(kernel, &module); }
