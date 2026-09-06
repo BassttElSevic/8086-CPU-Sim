@@ -1,16 +1,55 @@
 # 8086-CPU-Sim
 
+---
+
+<div align="center">
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Repository](https://img.shields.io/badge/GitHub-Repo-181717?style=flat-square&logo=github)](https://github.com/BassttELSevic/8086-CPU-Sim/)
+[![C++](https://img.shields.io/badge/C++-00599C?style=flat-square&logo=cplusplus&logoColor=white)](https://isocpp.org/)
+[![C](https://img.shields.io/badge/C-00599C?style=flat-square&logo=c&logoColor=white)](https://www.iso.org/standard/74528.html)
+[![Assembly](https://img.shields.io/badge/Assembly-654FF0?style=flat-square&logo=assemblyscript&logoColor=white)](https://en.wikipedia.org/wiki/Assembly_language)
+[![Linux](https://img.shields.io/badge/Linux-000000?style=flat-square&logo=linux&logoColor=white)](https://www.linux.org/)
+[![Windows](https://img.shields.io/badge/Windows-0078D6?style=flat-square&logo=windows&logoColor=white)](https://www.microsoft.com/windows)
+[![8086 CPU](https://img.shields.io/badge/8086_CPU-0071C5?style=flat-square&logo=intel&logoColor=white)](https://en.wikipedia.org/wiki/Intel_8086)
+[![Qt6](https://img.shields.io/badge/Qt6-41CD52?style=flat-square&logo=qt&logoColor=white)](https://www.qt.io/)
+[![GCC](https://img.shields.io/badge/GCC-FF6600?style=flat-square&logo=gcc&logoColor=white)](https://gcc.gnu.org/)
+[![Makefile](https://img.shields.io/badge/Makefile-427819?style=flat-square&logo=gnu&logoColor=white)](https://www.gnu.org/software/make/)
+
+</div>
+
+## release连接
+
+https://github.com/BassttElSevic/8086-CPU-Sim/releases/tag/v0.1.4
+
 ## 项目目的
 
-本项目使用 C 语言，在寄存器级别模拟一颗 8086 CPU，并为它提供可以运行 DOS 的最小 PC 环境。
+本项目核心使用 C 语言，gui部分则使用C++的qt库制作而成。在寄存器级别模拟一颗 8086 CPU，并为它提供可以运行 DOS 的最小 PC 环境。
 
 CPU 的实现是本项目的核心。CPU 部分几乎完整描述了 8086 的寄存器、指令执行所需的逻辑单元和内部控制关系，并模拟取指、译码、执行、总线访问、BIU/EU 协作以及相关时序行为。代码用于展示一条指令如何经过数据通路和控制逻辑，最终改变寄存器、Flags、内存或外设状态。
 
 项目主要用于学习计算机组成原理。阅读和调试这些模块，可以把寄存器、ALU、总线、状态机、中断和存储器访问放到同一个可运行系统中观察。掌握这套结构后，可以继续在现有框架上尝试实现更复杂的处理器结构，例如超标量发射、流水线冒险处理、乱序执行、寄存器重命名和提交阶段。
 
-<img width="1094" height="664" alt="DOS安装" src="https://github.com/user-attachments/assets/e7c054c7-13c5-400a-91cb-1055931a81d5" />
+实测可以完成ms-dos的下载，但是由于微软的版权©，很抱歉，我们没法做成三张软盘的.img也打包进入，请自己前往相应的地方下载。
 
-<img width="1264" height="660" alt="Q-BASIC解释器的运行" src="https://github.com/user-attachments/assets/54f17c69-fb13-4f1d-b5b1-0f8d32984009" />
+先把第一张软盘的.img放进去，然后启动你的这个模拟器，接着等他在跑的时候，点击硬盘那里，点击一个new,这会创造一个.img文件作为这个假的C盘，后面模拟安系统的时候，就会一直整这个你自己新建的.img文件，放心不会整你真实的
+
+安的时候看提示，如果提醒你要换“软盘的时候”就取出来，然后塞入第二张，然后点击reload,再enter,这个就可以“换盘”了。
+
+现在相关的驱动以及啥还没有做，我们会在未来不久做完这些
+
+~~copyleft万岁！！！~~
+
+<img width="1911" height="1078" alt="图片" src="https://github.com/user-attachments/assets/6e44b0a6-b621-4b28-a4bb-691f2a910b73" />
+
+<img width="1911" height="1078" alt="图片" src="https://github.com/user-attachments/assets/236a08ed-b6b0-4b48-955c-2859101ff099" />
+
+<img width="1918" height="1077" alt="图片" src="https://github.com/user-attachments/assets/5f718d0c-4c2b-48fa-a763-4e8942ae0bdd" />
+
+<img width="1911" height="1073" alt="图片" src="https://github.com/user-attachments/assets/b6642278-0d78-43b3-9fd2-c3e8e58ed2ba" />
+
+<img width="1920" height="1080" alt="图片" src="https://github.com/user-attachments/assets/737b7ea1-c3d4-4583-aa38-839c165084e9" />
+
 
 ## 项目边界
 
@@ -131,7 +170,7 @@ src/sim_system.c      整机挂载和启动配置
 
 ## 构建
 
-项目已支持跨平台构建。Makefile 会自动检测宿主平台（Windows / Linux / macOS），并选用对应的编译器、可执行后缀（`Windows` 用 `.exe`）、GUI 链接库与文件操作方式。
+项目已支持跨平台构建。Makefile 会自动检测宿主平台（Windows / Linux / ~~macOS现在还没好~~），并选用对应的编译器、可执行后缀（`Windows` 用 `.exe`）、GUI 链接库与文件操作方式。
 
 前置依赖：`make`（GNU Make）、C 编译器（GCC / Clang / MinGW），以及 binutils 的 `as`、`objcopy`（用于把 `firmware/` 里的 `.S` 汇编成 BIOS 镜像；各平台通用）。
 
@@ -143,7 +182,7 @@ src/sim_system.c      整机挂载和启动配置
 
 引擎库 `libsim.a` 为纯 C，已把旧的 Win32/GDI CGA 显示模块从引擎库中剔除（见 `src/sim_cga_console.c`，保留供参考），因此可在各平台编译。
 
-### Linux / macOS 原生构建
+### Linux  原生构建
 
 在仓库根目录执行：
 
@@ -159,6 +198,12 @@ Windows 上使用 MinGW 自带的 make 执行：
 mingw32-make
 # 或 make（若已在 PATH 中）
 ```
+
+### macOS 上，就，emmmm
+
+私密马赛，我没macOS，这上面还有小问题，如果有人有点话，欢迎提交PR
+
+qwq
 
 ### 在 Linux 上交叉编译 Windows 版
 
@@ -201,10 +246,21 @@ make clean
 自己编译后按平台启动：
 
 - Windows：`dist\apps\pc_sim_launcher.exe`（双击即可，BIOS 自动加载）
-- Linux / macOS：`./dist/apps/pc_sim_launcher`
+- Linux ：`./dist/apps/pc_sim_launcher`
+- ~~macOS快了，快了（也许吧~~
 
 命令行可传 `--bios`、`--floppy`、`--hdd`、`--create-hdd`，以及 `--run`（启动即用所选介质挂载运行）。
+
+你搞gui也行
 
 图形启动器中可选择 BIOS ROM、启动软盘镜像和可写硬盘镜像后观察启动流程。磁盘文件使用原始扇区镜像格式，具体容量和挂载方式以 Launcher 当前支持范围为准。
 
 项目当前的可运行范围取决于 BIOS、DOS 镜像和各行为级设备模型之间的配合。CPU 模块适合继续进行指令级和微结构级学习，整机外设部分适合进行接口替换、兼容性验证和时序实验。
+
+## absolute cinema
+
+<div align="center">
+
+<img width="1512" height="774" alt="图片" src="https://github.com/user-attachments/assets/6866fd90-ec24-4e7f-a10d-983e6269c75c" />
+
+</div>
