@@ -1,5 +1,27 @@
 # 8086-CPU-Sim
 
+---
+
+<div align="center">
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Repository](https://img.shields.io/badge/GitHub-Repo-181717?style=flat-square&logo=github)](https://github.com/BassttELSevic/8086-CPU-Sim/)
+[![C++](https://img.shields.io/badge/C++-00599C?style=flat-square&logo=cplusplus&logoColor=white)](https://isocpp.org/)
+[![C](https://img.shields.io/badge/C-00599C?style=flat-square&logo=c&logoColor=white)](https://www.iso.org/standard/74528.html)
+[![Assembly](https://img.shields.io/badge/Assembly-654FF0?style=flat-square&logo=assemblyscript&logoColor=white)](https://en.wikipedia.org/wiki/Assembly_language)
+[![Linux](https://img.shields.io/badge/Linux-000000?style=flat-square&logo=linux&logoColor=white)](https://www.linux.org/)
+[![Windows](https://img.shields.io/badge/Windows-0078D6?style=flat-square&logo=windows&logoColor=white)](https://www.microsoft.com/windows)
+[![8086 CPU](https://img.shields.io/badge/8086_CPU-0071C5?style=flat-square&logo=intel&logoColor=white)](https://en.wikipedia.org/wiki/Intel_8086)
+[![Qt6](https://img.shields.io/badge/Qt6-41CD52?style=flat-square&logo=qt&logoColor=white)](https://www.qt.io/)
+[![GCC](https://img.shields.io/badge/GCC-FF6600?style=flat-square&logo=gcc&logoColor=white)](https://gcc.gnu.org/)
+[![Makefile](https://img.shields.io/badge/Makefile-427819?style=flat-square&logo=gnu&logoColor=white)](https://www.gnu.org/software/make/)
+
+</div>
+
+## release连接
+
+https://github.com/BassttElSevic/8086-CPU-Sim/releases/tag/v0.1.4
+
 ## 项目目的
 
 本项目核心使用 C 语言，gui部分则使用C++的qt库制作而成。在寄存器级别模拟一颗 8086 CPU，并为它提供可以运行 DOS 的最小 PC 环境。
@@ -234,3 +256,11 @@ make clean
 图形启动器中可选择 BIOS ROM、启动软盘镜像和可写硬盘镜像后观察启动流程。磁盘文件使用原始扇区镜像格式，具体容量和挂载方式以 Launcher 当前支持范围为准。
 
 项目当前的可运行范围取决于 BIOS、DOS 镜像和各行为级设备模型之间的配合。CPU 模块适合继续进行指令级和微结构级学习，整机外设部分适合进行接口替换、兼容性验证和时序实验。
+
+## absolute cinema
+
+<div align="center">
+
+<img width="1512" height="774" alt="图片" src="https://github.com/user-attachments/assets/6866fd90-ec24-4e7f-a10d-983e6269c75c" />
+
+</div>
