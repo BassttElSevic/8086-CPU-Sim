@@ -146,7 +146,12 @@ libsim: $(LIB_SIM)
 
 # ---------- Qt 前端 ----------
 QT_CXX       ?= g++
-QT_CXXFLAGS  = -std=c++17 $(OPTIMIZE) -Wall -Wextra -Iinclude $(QT_CFLAGS)
+# Qt6 构建默认启用 reduce_relocations，要求引用 Qt 的目标文件用位置无关代码(PIC)
+# 编译，否则在较新工具链(GCC 16 / Clang)上链接时会报
+#   `copy relocation against non-copyable protected symbol`
+# （例如 QTimer::staticMetaObject）。加 -fPIC 是 Qt 官方对 GUI 应用的标准要求，
+# 对 Linux/macOS/Windows(MinGW 接受但无影响) 都安全。
+QT_CXXFLAGS  = -std=c++17 $(OPTIMIZE) -Wall -Wextra -fPIC -Iinclude $(QT_CFLAGS)
 QT_SOURCES   := $(wildcard apps/frontend-qt/*.cpp)
 QT_OBJECTS   := $(patsubst apps/frontend-qt/%.cpp,$(BUILD_DIR)/qt/%.o,$(QT_SOURCES))
 # 升级后的前端复用「启动器」这个产物名，作为跨平台 GUI 的默认形态。

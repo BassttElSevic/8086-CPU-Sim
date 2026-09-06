@@ -216,6 +216,17 @@ jobs:
           arch: "clang_64"
           cache: true
 
+      - name: Install GNU binutils (for the 16-bit BIOS firmware assembler)
+        # macOS 默认的 `as` 是 Apple clang 驱动，不认 GNU as 的 `--32` 标志，
+        # 编译 firmware/*.S(.code16/i8086) 时会报
+        #   `clang: error: unknown argument: '--32'`。
+        # 这里安装 GNU binutils，把 `as`/`objcopy` 指向真正的 GNU 版本。
+        # GitHub macOS runner 自带 Homebrew。
+        run: |
+          brew install binutils
+          BIN="$(brew --prefix binutils)/bin"
+          echo "GNU_BIN=$BIN" >> "$GITHUB_ENV"
+
       - name: Build macOS launcher (Qt GUI) + make .app
         env:
           VER: ${{ github.ref_name }}
@@ -226,7 +237,8 @@ jobs:
           export QT_LIBS="-F$QT_LIB -framework QtWidgets -framework QtGui -framework QtCore"
           export QT_CXX="clang++"
           make clean
-          make FE=qt CC=cc CXX=clang++
+          # 用 GNU binutils 的 as/objcopy 编译固件，避开 Apple clang 不认 --32 的问题。
+          make FE=qt CC=cc CXX=clang++ AS="$GNU_BIN/as" OBJCOPY="$GNU_BIN/objcopy"
           # 先包成标准的 macOS .app 目录结构，macdeployqt 才能把 Qt 框架内嵌、实现双击即用。
           APPDIR="portable/pc-sim-mac/pc_sim_launcher.app"
           mkdir -p "$APPDIR/Contents/MacOS" "$APPDIR/Contents/Resources"
