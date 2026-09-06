@@ -220,12 +220,27 @@ jobs:
         # macOS 默认的 `as` 是 Apple clang 驱动，不认 GNU as 的 `--32` 标志，
         # 编译 firmware/*.S(.code16/i8086) 时会报
         #   `clang: error: unknown argument: '--32'`。
-        # 这里安装 GNU binutils，把 `as`/`objcopy` 指向真正的 GNU 版本。
-        # GitHub macOS runner 自带 Homebrew。
+        # 这里安装 GNU binutils，并把 as/objcopy 指到真正能处理 16 位的 GNU 版本。
+        # 注意：Homebrew 的 binutils 属于 keg-only，且在部分版本把工具命名成
+        # `gas`/`gobjcopy`（g 前缀），所以这里动态探测实际文件名，避免硬编码踩坑。
         run: |
           brew install binutils
           BIN="$(brew --prefix binutils)/bin"
-          echo "GNU_BIN=$BIN" >> "$GITHUB_ENV"
+          # 在 bin 目录里找真正的 GNU 汇编器/objcopy（as|gas、objcopy|gobjcopy）
+          for c in as gas; do
+            if [ -x "$BIN/$c" ]; then ASFOUND="$BIN/$c"; break; fi
+          done
+          for c in objcopy gobjcopy; do
+            if [ -x "$BIN/$c" ]; then OBJFOUND="$BIN/$c"; break; fi
+          done
+          if [ -z "$ASFOUND" ] || [ -z "$OBJFOUND" ]; then
+            echo "未在 $BIN 找到 GNU as/objcopy (as|gas / objcopy|gobjcopy)"
+            ls -1 "$BIN" 2>&1 | head
+            exit 1
+          fi
+          echo "GNU_AS=$ASFOUND"    >> "$GITHUB_ENV"
+          echo "GNU_OBJCOPY=$OBJFOUND" >> "$GITHUB_ENV"
+          echo "使用 $ASFOUND / $OBJFOUND"
 
       - name: Build macOS launcher (Qt GUI) + make .app
         env:
@@ -238,7 +253,7 @@ jobs:
           export QT_CXX="clang++"
           make clean
           # 用 GNU binutils 的 as/objcopy 编译固件，避开 Apple clang 不认 --32 的问题。
-          make FE=qt CC=cc CXX=clang++ AS="$GNU_BIN/as" OBJCOPY="$GNU_BIN/objcopy"
+          make FE=qt CC=cc CXX=clang++ AS="$GNU_AS" OBJCOPY="$GNU_OBJCOPY"
           # 先包成标准的 macOS .app 目录结构，macdeployqt 才能把 Qt 框架内嵌、实现双击即用。
           APPDIR="portable/pc-sim-mac/pc_sim_launcher.app"
           mkdir -p "$APPDIR/Contents/MacOS" "$APPDIR/Contents/Resources"
